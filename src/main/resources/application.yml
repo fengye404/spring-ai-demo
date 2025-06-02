@@ -1,19 +1,10 @@
-server:
-  port: 8080
-
 spring:
   application:
-    name: spring-ai-demo
-  
-  # Spring AI DashScope 配置
+    name: alibaba-ai-demo
+
   ai:
     dashscope:
-      api-key: ${DASHSCOPE_API_KEY:your-dashscope-api-key}
-      agent:
-        app-id: ${DASHSCOPE_APP_ID:your-app-id}
-      
-logging:
-  level:
-    top.fengye: DEBUG
-    org.springframework.ai: DEBUG
-    com.alibaba.cloud.ai: DEBUG 
+      api-key: ${AI_DASHSCOPE_API_KEY}   # api key
+      chat:
+        options:
+          model: deepseek-r1   # 模型名称

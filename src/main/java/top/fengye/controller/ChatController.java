@@ -34,7 +34,7 @@ import java.util.concurrent.CompletableFuture;
 public class ChatController {
 
     private static final Logger logger = LoggerFactory.getLogger(ChatController.class);
-    
+
     private final ChatClient chatClient;
 
     public ChatController(ChatClient.Builder builder) {
@@ -48,11 +48,11 @@ public class ChatController {
                 .call()
                 .content();
     }
-    
+
     @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter chatStream(@RequestParam(value = "input") String input) {
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
-        
+
         // 异步处理流式响应
         CompletableFuture.runAsync(() -> {
             try {
@@ -61,51 +61,51 @@ public class ChatController {
                         .user(input)
                         .stream()
                         .content();
-                
+
                 // 处理流式数据
                 contentStream.subscribe(
-                    content -> {
-                        try {
-                            // 发送每个内容块
-                            emitter.send(SseEmitter.event()
-                                    .name("message")
-                                    .data(content));
-                        } catch (IOException e) {
-                            logger.error("Error sending SSE data", e);
-                            emitter.completeWithError(e);
+                        content -> {
+                            try {
+                                // 发送每个内容块
+                                emitter.send(SseEmitter.event()
+                                        .name("message")
+                                        .data(content));
+                            } catch (IOException e) {
+                                logger.error("Error sending SSE data", e);
+                                emitter.completeWithError(e);
+                            }
+                        },
+                        error -> {
+                            logger.error("Error in stream processing", error);
+                            try {
+                                emitter.send(SseEmitter.event()
+                                        .name("error")
+                                        .data("处理请求时发生错误: " + error.getMessage()));
+                            } catch (IOException e) {
+                                logger.error("Error sending error event", e);
+                            }
+                            emitter.completeWithError(error);
+                        },
+                        () -> {
+                            try {
+                                // 发送结束事件
+                                emitter.send(SseEmitter.event()
+                                        .name("end")
+                                        .data(""));
+                                emitter.complete();
+                            } catch (IOException e) {
+                                logger.error("Error completing SSE", e);
+                                emitter.completeWithError(e);
+                            }
                         }
-                    },
-                    error -> {
-                        logger.error("Error in stream processing", error);
-                        try {
-                            emitter.send(SseEmitter.event()
-                                    .name("error")
-                                    .data("处理请求时发生错误: " + error.getMessage()));
-                        } catch (IOException e) {
-                            logger.error("Error sending error event", e);
-                        }
-                        emitter.completeWithError(error);
-                    },
-                    () -> {
-                        try {
-                            // 发送结束事件
-                            emitter.send(SseEmitter.event()
-                                    .name("end")
-                                    .data(""));
-                            emitter.complete();
-                        } catch (IOException e) {
-                            logger.error("Error completing SSE", e);
-                            emitter.completeWithError(e);
-                        }
-                    }
                 );
-                
+
             } catch (Exception e) {
                 logger.error("Error processing chat stream", e);
                 emitter.completeWithError(e);
             }
         });
-        
+
         return emitter;
     }
 }

@@ -201,335 +201,335 @@
     </style>
 </head>
 <body>
-    <div class="chat-container">
-        <div class="chat-header">
-            <h1>🤖 Spring AI 聊天助手</h1>
-            <p style="font-size: 0.9rem; opacity: 0.9; margin-top: 5px;">基于 Spring AI 的智能对话系统</p>
-            <div style="margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 10px;">
-                <span style="font-size: 0.8rem; opacity: 0.8;">模式:</span>
-                <button id="modeToggle" class="mode-toggle" onclick="toggleMode()">
-                    <span id="modeText">🚀 流式模式</span>
-                </button>
-            </div>
-        </div>
-        
-        <div class="chat-messages" id="chatMessages">
-            <div class="message bot">
-                <div class="message-content">
-                    👋 您好！我是您的AI助手，有什么可以帮助您的吗？
-                    <div class="timestamp" id="welcomeTime"></div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="chat-input-container">
-            <form class="chat-input-form" id="chatForm">
-                <input 
-                    type="text" 
-                    class="chat-input" 
-                    id="messageInput" 
-                    placeholder="输入您的消息..." 
-                    autocomplete="off"
-                    required
-                >
-                <button type="submit" class="send-button" id="sendButton">
-                    发送
-                </button>
-            </form>
+<div class="chat-container">
+    <div class="chat-header">
+        <h1>🤖 Spring AI 聊天助手</h1>
+        <p style="font-size: 0.9rem; opacity: 0.9; margin-top: 5px;">基于 Spring AI 的智能对话系统</p>
+        <div style="margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+            <span style="font-size: 0.8rem; opacity: 0.8;">模式:</span>
+            <button id="modeToggle" class="mode-toggle" onclick="toggleMode()">
+                <span id="modeText">🚀 流式模式</span>
+            </button>
         </div>
     </div>
 
-    <script>
-        const chatMessages = document.getElementById('chatMessages');
-        const chatForm = document.getElementById('chatForm');
-        const messageInput = document.getElementById('messageInput');
-        const sendButton = document.getElementById('sendButton');
+    <div class="chat-messages" id="chatMessages">
+        <div class="message bot">
+            <div class="message-content">
+                👋 您好！我是您的AI助手，有什么可以帮助您的吗？
+                <div class="timestamp" id="welcomeTime"></div>
+            </div>
+        </div>
+    </div>
 
-        // 模式状态
-        let isStreamMode = true;
+    <div class="chat-input-container">
+        <form class="chat-input-form" id="chatForm">
+            <input
+                    type="text"
+                    class="chat-input"
+                    id="messageInput"
+                    placeholder="输入您的消息..."
+                    autocomplete="off"
+                    required
+            >
+            <button type="submit" class="send-button" id="sendButton">
+                发送
+            </button>
+        </form>
+    </div>
+</div>
 
-        // 设置欢迎消息时间戳
-        document.getElementById('welcomeTime').textContent = formatTime(new Date());
+<script>
+    const chatMessages = document.getElementById('chatMessages');
+    const chatForm = document.getElementById('chatForm');
+    const messageInput = document.getElementById('messageInput');
+    const sendButton = document.getElementById('sendButton');
 
-        // 切换模式
-        function toggleMode() {
-            isStreamMode = !isStreamMode;
-            const modeText = document.getElementById('modeText');
-            if (isStreamMode) {
-                modeText.textContent = '🚀 流式模式';
-            } else {
-                modeText.textContent = '📝 普通模式';
-            }
+    // 模式状态
+    let isStreamMode = true;
+
+    // 设置欢迎消息时间戳
+    document.getElementById('welcomeTime').textContent = formatTime(new Date());
+
+    // 切换模式
+    function toggleMode() {
+        isStreamMode = !isStreamMode;
+        const modeText = document.getElementById('modeText');
+        if (isStreamMode) {
+            modeText.textContent = '🚀 流式模式';
+        } else {
+            modeText.textContent = '📝 普通模式';
+        }
+    }
+
+    // 格式化时间
+    function formatTime(date) {
+        return date.toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    // 添加消息到聊天区域
+    function addMessage(content, isUser = false) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+
+        const messageContent = document.createElement('div');
+        messageContent.className = 'message-content';
+        messageContent.innerHTML = content;
+
+        const timestamp = document.createElement('div');
+        timestamp.className = 'timestamp';
+        timestamp.textContent = formatTime(new Date());
+        messageContent.appendChild(timestamp);
+
+        messageDiv.appendChild(messageContent);
+        chatMessages.appendChild(messageDiv);
+
+        // 滚动到底部
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        return messageDiv;
+    }
+
+    // 创建流式消息容器
+    function createStreamMessage() {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message bot';
+
+        const messageContent = document.createElement('div');
+        messageContent.className = 'message-content';
+
+        const textContent = document.createElement('span');
+        textContent.className = 'message-text';
+        messageContent.appendChild(textContent);
+
+        const timestamp = document.createElement('div');
+        timestamp.className = 'timestamp';
+        timestamp.textContent = formatTime(new Date());
+        messageContent.appendChild(timestamp);
+
+        messageDiv.appendChild(messageContent);
+        chatMessages.appendChild(messageDiv);
+
+        // 滚动到底部
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        return {
+            container: messageDiv,
+            textElement: textContent
+        };
+    }
+
+    // 显示加载动画
+    function showLoading() {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'message bot';
+        loadingDiv.id = 'loadingMessage';
+
+        const loadingContent = document.createElement('div');
+        loadingContent.className = 'message-content';
+
+        const loadingAnimation = document.createElement('div');
+        loadingAnimation.className = 'loading';
+        loadingAnimation.innerHTML = `
+            <div class="loading-dot"></div>
+            <div class="loading-dot"></div>
+            <div class="loading-dot"></div>
+        `;
+
+        loadingContent.appendChild(loadingAnimation);
+        loadingDiv.appendChild(loadingContent);
+        chatMessages.appendChild(loadingDiv);
+
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // 移除加载动画
+    function removeLoading() {
+        const loadingMessage = document.getElementById('loadingMessage');
+        if (loadingMessage) {
+            loadingMessage.remove();
+        }
+    }
+
+    // 添加打字机光标效果
+    function addTypingCursor(element) {
+        const cursor = document.createElement('span');
+        cursor.className = 'typing-cursor';
+        cursor.textContent = '▋';
+        cursor.style.cssText = `
+            animation: blink 1s infinite;
+            color: #667eea;
+            font-weight: bold;
+        `;
+
+        // 添加CSS动画
+        if (!document.querySelector('#typing-cursor-style')) {
+            const style = document.createElement('style');
+            style.id = 'typing-cursor-style';
+            style.textContent = `
+                @keyframes blink {
+                    0%, 50% { opacity: 1; }
+                    51%, 100% { opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
         }
 
-        // 格式化时间
-        function formatTime(date) {
-            return date.toLocaleTimeString('zh-CN', {
-                hour: '2-digit',
-                minute: '2-digit'
+        element.appendChild(cursor);
+        return cursor;
+    }
+
+    // 移除打字机光标
+    function removeTypingCursor(cursor) {
+        if (cursor && cursor.parentNode) {
+            cursor.parentNode.removeChild(cursor);
+        }
+    }
+
+    // 传统发送消息（非流式）
+    async function sendRegularMessage(message) {
+        try {
+            sendButton.disabled = true;
+            sendButton.textContent = '发送中...';
+
+            showLoading();
+
+            const response = await fetch(`/chat?input=${encodeURIComponent(message)}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
             });
-        }
 
-        // 添加消息到聊天区域
-        function addMessage(content, isUser = false) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
-            
-            const messageContent = document.createElement('div');
-            messageContent.className = 'message-content';
-            messageContent.innerHTML = content;
-            
-            const timestamp = document.createElement('div');
-            timestamp.className = 'timestamp';
-            timestamp.textContent = formatTime(new Date());
-            messageContent.appendChild(timestamp);
-            
-            messageDiv.appendChild(messageContent);
-            chatMessages.appendChild(messageDiv);
-            
-            // 滚动到底部
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-            
-            return messageDiv;
-        }
+            removeLoading();
 
-        // 创建流式消息容器
-        function createStreamMessage() {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message bot';
-            
-            const messageContent = document.createElement('div');
-            messageContent.className = 'message-content';
-            
-            const textContent = document.createElement('span');
-            textContent.className = 'message-text';
-            messageContent.appendChild(textContent);
-            
-            const timestamp = document.createElement('div');
-            timestamp.className = 'timestamp';
-            timestamp.textContent = formatTime(new Date());
-            messageContent.appendChild(timestamp);
-            
-            messageDiv.appendChild(messageContent);
-            chatMessages.appendChild(messageDiv);
-            
-            // 滚动到底部
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-            
-            return {
-                container: messageDiv,
-                textElement: textContent
-            };
-        }
-
-        // 显示加载动画
-        function showLoading() {
-            const loadingDiv = document.createElement('div');
-            loadingDiv.className = 'message bot';
-            loadingDiv.id = 'loadingMessage';
-            
-            const loadingContent = document.createElement('div');
-            loadingContent.className = 'message-content';
-            
-            const loadingAnimation = document.createElement('div');
-            loadingAnimation.className = 'loading';
-            loadingAnimation.innerHTML = `
-                <div class="loading-dot"></div>
-                <div class="loading-dot"></div>
-                <div class="loading-dot"></div>
-            `;
-            
-            loadingContent.appendChild(loadingAnimation);
-            loadingDiv.appendChild(loadingContent);
-            chatMessages.appendChild(loadingDiv);
-            
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        // 移除加载动画
-        function removeLoading() {
-            const loadingMessage = document.getElementById('loadingMessage');
-            if (loadingMessage) {
-                loadingMessage.remove();
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-        }
 
-        // 添加打字机光标效果
-        function addTypingCursor(element) {
-            const cursor = document.createElement('span');
-            cursor.className = 'typing-cursor';
-            cursor.textContent = '▋';
-            cursor.style.cssText = `
-                animation: blink 1s infinite;
-                color: #667eea;
-                font-weight: bold;
-            `;
-            
-            // 添加CSS动画
-            if (!document.querySelector('#typing-cursor-style')) {
-                const style = document.createElement('style');
-                style.id = 'typing-cursor-style';
-                style.textContent = `
-                    @keyframes blink {
-                        0%, 50% { opacity: 1; }
-                        51%, 100% { opacity: 0; }
-                    }
-                `;
-                document.head.appendChild(style);
-            }
-            
-            element.appendChild(cursor);
-            return cursor;
-        }
+            const result = await response.text();
+            addMessage(result);
 
-        // 移除打字机光标
-        function removeTypingCursor(cursor) {
-            if (cursor && cursor.parentNode) {
-                cursor.parentNode.removeChild(cursor);
-            }
+        } catch (error) {
+            removeLoading();
+            console.error('Error:', error);
+            addMessage('❌ 抱歉，发生了错误，请稍后重试。错误信息：' + error.message);
         }
+    }
 
-        // 传统发送消息（非流式）
-        async function sendRegularMessage(message) {
+    // 流式发送消息
+    function sendStreamMessage(message) {
+        return new Promise((resolve, reject) => {
             try {
                 sendButton.disabled = true;
                 sendButton.textContent = '发送中...';
-                
-                showLoading();
-                
-                const response = await fetch(`/chat?input=${encodeURIComponent(message)}`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
+
+                // 创建流式消息容器
+                const streamMessage = createStreamMessage();
+                const cursor = addTypingCursor(streamMessage.textElement);
+
+                let fullResponse = '';
+
+                // 创建EventSource连接
+                const eventSource = new EventSource(`/chat/stream?input=${encodeURIComponent(message)}`);
+
+                // 处理消息事件
+                eventSource.addEventListener('message', function(event) {
+                    const chunk = event.data;
+                    fullResponse += chunk;
+
+                    // 移除光标，更新内容，重新添加光标
+                    removeTypingCursor(cursor);
+                    streamMessage.textElement.textContent = fullResponse;
+                    const newCursor = addTypingCursor(streamMessage.textElement);
+                    cursor.remove = () => removeTypingCursor(newCursor);
+
+                    // 滚动到底部
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
                 });
-                
-                removeLoading();
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const result = await response.text();
-                addMessage(result);
-                
+
+                // 处理结束事件
+                eventSource.addEventListener('end', function(event) {
+                    removeTypingCursor(cursor);
+                    eventSource.close();
+                    resolve(fullResponse);
+                });
+
+                // 处理错误事件
+                eventSource.addEventListener('error', function(event) {
+                    console.error('EventSource error:', event);
+                    removeTypingCursor(cursor);
+
+                    if (event.data) {
+                        streamMessage.textElement.textContent = event.data;
+                    } else {
+                        streamMessage.textElement.textContent = '❌ 连接错误，请稍后重试';
+                    }
+
+                    eventSource.close();
+                    reject(new Error('Stream error'));
+                });
+
+                // 处理连接错误
+                eventSource.onerror = function(event) {
+                    console.error('EventSource connection error:', event);
+                    removeTypingCursor(cursor);
+                    streamMessage.textElement.textContent = '❌ 连接失败，请检查网络或稍后重试';
+                    eventSource.close();
+                    reject(new Error('Connection failed'));
+                };
+
             } catch (error) {
-                removeLoading();
                 console.error('Error:', error);
-                addMessage('❌ 抱歉，发生了错误，请稍后重试。错误信息：' + error.message);
+                reject(error);
             }
-        }
+        });
+    }
 
-        // 流式发送消息
-        function sendStreamMessage(message) {
-            return new Promise((resolve, reject) => {
-                try {
-                    sendButton.disabled = true;
-                    sendButton.textContent = '发送中...';
-                    
-                    // 创建流式消息容器
-                    const streamMessage = createStreamMessage();
-                    const cursor = addTypingCursor(streamMessage.textElement);
-                    
-                    let fullResponse = '';
-                    
-                    // 创建EventSource连接
-                    const eventSource = new EventSource(`/chat/stream?input=${encodeURIComponent(message)}`);
-                    
-                    // 处理消息事件
-                    eventSource.addEventListener('message', function(event) {
-                        const chunk = event.data;
-                        fullResponse += chunk;
-                        
-                        // 移除光标，更新内容，重新添加光标
-                        removeTypingCursor(cursor);
-                        streamMessage.textElement.textContent = fullResponse;
-                        const newCursor = addTypingCursor(streamMessage.textElement);
-                        cursor.remove = () => removeTypingCursor(newCursor);
-                        
-                        // 滚动到底部
-                        chatMessages.scrollTop = chatMessages.scrollHeight;
-                    });
-                    
-                    // 处理结束事件
-                    eventSource.addEventListener('end', function(event) {
-                        removeTypingCursor(cursor);
-                        eventSource.close();
-                        resolve(fullResponse);
-                    });
-                    
-                    // 处理错误事件
-                    eventSource.addEventListener('error', function(event) {
-                        console.error('EventSource error:', event);
-                        removeTypingCursor(cursor);
-                        
-                        if (event.data) {
-                            streamMessage.textElement.textContent = event.data;
-                        } else {
-                            streamMessage.textElement.textContent = '❌ 连接错误，请稍后重试';
-                        }
-                        
-                        eventSource.close();
-                        reject(new Error('Stream error'));
-                    });
-                    
-                    // 处理连接错误
-                    eventSource.onerror = function(event) {
-                        console.error('EventSource connection error:', event);
-                        removeTypingCursor(cursor);
-                        streamMessage.textElement.textContent = '❌ 连接失败，请检查网络或稍后重试';
-                        eventSource.close();
-                        reject(new Error('Connection failed'));
-                    };
-                    
-                } catch (error) {
-                    console.error('Error:', error);
-                    reject(error);
-                }
-            });
-        }
+    // 表单提交事件
+    chatForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
 
-        // 表单提交事件
-        chatForm.addEventListener('submit', async (e) => {
+        const message = messageInput.value.trim();
+        if (!message) return;
+
+        // 添加用户消息
+        addMessage(message, true);
+
+        // 清空输入框
+        messageInput.value = '';
+
+        try {
+            if (isStreamMode) {
+                // 发送流式消息
+                await sendStreamMessage(message);
+            } else {
+                // 发送普通消息
+                await sendRegularMessage(message);
+            }
+        } catch (error) {
+            console.error('发送消息失败:', error);
+        } finally {
+            sendButton.disabled = false;
+            sendButton.textContent = '发送';
+        }
+    });
+
+    // 输入框回车事件
+    messageInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            
-            const message = messageInput.value.trim();
-            if (!message) return;
-            
-            // 添加用户消息
-            addMessage(message, true);
-            
-            // 清空输入框
-            messageInput.value = '';
-            
-            try {
-                if (isStreamMode) {
-                    // 发送流式消息
-                    await sendStreamMessage(message);
-                } else {
-                    // 发送普通消息
-                    await sendRegularMessage(message);
-                }
-            } catch (error) {
-                console.error('发送消息失败:', error);
-            } finally {
-                sendButton.disabled = false;
-                sendButton.textContent = '发送';
-            }
-        });
+            chatForm.dispatchEvent(new Event('submit'));
+        }
+    });
 
-        // 输入框回车事件
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                chatForm.dispatchEvent(new Event('submit'));
-            }
-        });
-
-        // 页面加载完成后聚焦输入框
-        window.addEventListener('load', () => {
-            messageInput.focus();
-        });
-    </script>
+    // 页面加载完成后聚焦输入框
+    window.addEventListener('load', () => {
+        messageInput.focus();
+    });
+</script>
 </body>
 </html> 
