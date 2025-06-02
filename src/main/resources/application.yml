@@ -1,0 +1,19 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: spring-ai-demo
+  
+  # Spring AI DashScope 配置
+  ai:
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY:your-dashscope-api-key}
+      agent:
+        app-id: ${DASHSCOPE_APP_ID:your-app-id}
+      
+logging:
+  level:
+    top.fengye: DEBUG
+    org.springframework.ai: DEBUG
+    com.alibaba.cloud.ai: DEBUG 
