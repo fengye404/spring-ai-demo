@@ -1,10 +1,6 @@
 package top.fengye.controller;
 
 
-import com.alibaba.cloud.ai.dashscope.agent.DashScopeAgent;
-import com.alibaba.cloud.ai.dashscope.agent.DashScopeAgentOptions;
-import com.alibaba.cloud.ai.dashscope.api.DashScopeAgentApi;
-
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatResponse;
