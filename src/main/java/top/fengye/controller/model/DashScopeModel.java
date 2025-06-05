@@ -1,15 +1,9 @@
 package top.fengye.controller.model;
 
-import com.alibaba.dashscope.aigc.generation.Generation;
-import com.alibaba.dashscope.aigc.generation.GenerationOutput;
 import com.alibaba.dashscope.aigc.generation.GenerationParam;
-import com.alibaba.dashscope.aigc.generation.GenerationResult;
 import com.alibaba.dashscope.common.Message;
 import com.alibaba.dashscope.common.Role;
-import com.alibaba.dashscope.exception.ApiException;
-import com.alibaba.dashscope.exception.InputRequiredException;
-import com.alibaba.dashscope.exception.NoApiKeyException;
-import com.alibaba.dashscope.utils.JsonUtils;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
@@ -18,6 +12,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * @author: FengYe
@@ -31,18 +26,11 @@ public class DashScopeModel implements ChatModel {
     }
 
     private GenerationParam convertDashScopeParam(Prompt prompt) {
-        List<org.springframework.ai.chat.messages.Message> instructions = prompt.getInstructions();
+        List<org.springframework.ai.chat.messages.Message> messages = prompt.getInstructions();
         ChatOptions options = prompt.getOptions();
 
-        Message systemMsg = Message.builder()
-                .role(Role.SYSTEM.getValue())
-                .content(prompt.getSystemMessage().getText())
-                .build();
-        Message userMsg = Message.builder()
-                .role(Role.USER.getValue())
-                .content("你是谁？")
-                .build();
-        GenerationParam generationParam = GenerationParam.builder()
+        // 1. 处理大模型 options
+        GenerationParam.GenerationParamBuilder<?, ?> paramBuilder = GenerationParam.builder()
                 .apiKey(System.getenv("DASHSCOPE_API_KEY"))
                 .model(options.getModel())
                 .topK(options.getTopK())
@@ -52,10 +40,40 @@ public class DashScopeModel implements ChatModel {
                 .repetitionPenalty(Objects.requireNonNull(options.getFrequencyPenalty()).floatValue())
                 .stopStrings(options.getStopSequences())
                 .incrementalOutput(false)
-                .messages(Arrays.asList(systemMsg, userMsg))
-                .resultFormat(GenerationParam.ResultFormat.MESSAGE)
-                .build();
-        return generationParam;
+                .resultFormat(GenerationParam.ResultFormat.MESSAGE);
+
+        // 2. 处理大模型 message
+        paramBuilder.messages(messages.stream().map(message -> {
+            switch (message.getMessageType()) {
+                case USER:
+                    return List.of(Message.builder()
+                            .role(Role.USER.getValue())
+                            .content(message.getText())
+                            .build());
+                case SYSTEM:
+                    return List.of(Message.builder()
+                            .role(Role.SYSTEM.getValue())
+                            .content(message.getText())
+                            .build());
+                case ASSISTANT:
+                    return List.of(Message.builder()
+                            .role(Role.ASSISTANT.getValue())
+                            .content(message.getText())
+                            .build());
+                case TOOL:
+                    ToolResponseMessage toolResponseMessage = (ToolResponseMessage) message;
+                    return toolResponseMessage.getResponses().stream().map(toolResponse -> Message.builder()
+                            .role(Role.TOOL.getValue())
+                            .toolCallId(toolResponse.id())
+                            .name(toolResponse.name())
+                            .content(toolResponse.responseData())
+                            .build()).toList();
+                default:
+                    throw new IllegalArgumentException("Invalid messageType: " + message.getMessageType());
+            }
+        }).flatMap(List::stream).collect(Collectors.toList()));
+
+        return paramBuilder.build();
     }
 
     public static void main(String[] args) {
