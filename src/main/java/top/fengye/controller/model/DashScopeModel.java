@@ -1,6 +1,7 @@
 package top.fengye.controller.model;
 
 import com.alibaba.dashscope.aigc.generation.Generation;
+import com.alibaba.dashscope.aigc.generation.GenerationOutput;
 import com.alibaba.dashscope.aigc.generation.GenerationParam;
 import com.alibaba.dashscope.aigc.generation.GenerationResult;
 import com.alibaba.dashscope.common.Message;
@@ -11,9 +12,12 @@ import com.alibaba.dashscope.exception.NoApiKeyException;
 import com.alibaba.dashscope.utils.JsonUtils;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 
 import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * @author: FengYe
@@ -26,34 +30,44 @@ public class DashScopeModel implements ChatModel {
         return null;
     }
 
-    public static GenerationResult callWithMessage() throws ApiException, NoApiKeyException, InputRequiredException {
-        Generation gen = new Generation();
+    private GenerationParam convertDashScopeParam(Prompt prompt) {
+        List<org.springframework.ai.chat.messages.Message> instructions = prompt.getInstructions();
+        ChatOptions options = prompt.getOptions();
+
         Message systemMsg = Message.builder()
                 .role(Role.SYSTEM.getValue())
-                .content("You are a helpful assistant.")
+                .content(prompt.getSystemMessage().getText())
                 .build();
         Message userMsg = Message.builder()
                 .role(Role.USER.getValue())
                 .content("你是谁？")
                 .build();
-        GenerationParam param = GenerationParam.builder()
-                // 若没有配置环境变量，请用百炼API Key将下行替换为：.apiKey("sk-xxx")
+        GenerationParam generationParam = GenerationParam.builder()
                 .apiKey(System.getenv("DASHSCOPE_API_KEY"))
-                // 此处以qwen-plus为例，可按需更换模型名称。模型列表：https://help.aliyun.com/zh/model-studio/getting-started/models
-                .model("qwen-max-latest")
+                .model(options.getModel())
+                .topK(options.getTopK())
+                .topP(options.getTopP())
+                .maxTokens(options.getMaxTokens())
+                .temperature(Objects.requireNonNull(options.getTemperature()).floatValue())
+                .repetitionPenalty(Objects.requireNonNull(options.getFrequencyPenalty()).floatValue())
+                .stopStrings(options.getStopSequences())
+                .incrementalOutput(false)
                 .messages(Arrays.asList(systemMsg, userMsg))
                 .resultFormat(GenerationParam.ResultFormat.MESSAGE)
                 .build();
-        return gen.call(param);
+        return generationParam;
     }
+
     public static void main(String[] args) {
-        try {
-            GenerationResult result = callWithMessage();
-            System.out.println(JsonUtils.toJson(result));
-        } catch (ApiException | NoApiKeyException | InputRequiredException e) {
-            // 使用日志框架记录异常信息
-            System.err.println("An error occurred while calling the generation service: " + e.getMessage());
-        }
-        System.exit(0);
+//        try {
+//            GenerationResult result = callWithMessage();
+//            GenerationOutput output = result.getOutput();
+//            System.out.println(output);
+//            System.out.println(JsonUtils.toJson(result));
+//        } catch (ApiException | NoApiKeyException | InputRequiredException e) {
+//            // 使用日志框架记录异常信息
+//            System.err.println("An error occurred while calling the generation service: " + e.getMessage());
+//        }
+//        System.exit(0);
     }
 }
