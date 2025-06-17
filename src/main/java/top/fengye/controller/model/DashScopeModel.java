@@ -14,6 +14,7 @@ import com.alibaba.dashscope.utils.JsonUtils;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.github.victools.jsonschema.generator.*;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.metadata.ChatGenerationMetadata;
@@ -24,6 +25,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.model.tool.DefaultToolCallingChatOptions;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
@@ -105,11 +107,18 @@ public class DashScopeModel implements ChatModel {
                 .topK(options.getTopK())
                 .topP(options.getTopP())
                 .maxTokens(options.getMaxTokens())
-                .temperature(Objects.requireNonNull(options.getTemperature()).floatValue())
-                .repetitionPenalty(Objects.requireNonNull(options.getFrequencyPenalty()).floatValue())
-                .stopStrings(options.getStopSequences())
                 .incrementalOutput(false)
                 .resultFormat(GenerationParam.ResultFormat.MESSAGE);
+
+        if(Objects.nonNull(options.getTemperature())){
+            paramBuilder.temperature(options.getTemperature().floatValue());
+        }
+        if(Objects.nonNull(options.getFrequencyPenalty())){
+            paramBuilder.repetitionPenalty(options.getFrequencyPenalty().floatValue());
+        }
+        if(Objects.nonNull(options.getStopSequences())){
+            paramBuilder.stopStrings(options.getStopSequences());
+        }
 
         // 2. 处理大模型 message
         paramBuilder.messages(messages.stream().map(message -> {
@@ -164,15 +173,12 @@ public class DashScopeModel implements ChatModel {
 
 
     public static void main(String[] args) {
-//        try {
-//            GenerationResult result = callWithMessage();
-//            GenerationOutput output = result.getOutput();
-//            System.out.println(output);
-//            System.out.println(JsonUtils.toJson(result));
-//        } catch (ApiException | NoApiKeyException | InputRequiredException e) {
-//            // 使用日志框架记录异常信息
-//            System.err.println("An error occurred while calling the generation service: " + e.getMessage());
-//        }
-//        System.exit(0);
+        ChatClient chatClient = ChatClient.create(new DashScopeModel());
+        DefaultToolCallingChatOptions options = new DefaultToolCallingChatOptions();
+        options.setModel("qwen-max");
+        System.out.println(chatClient.prompt().options(options)
+                .user("你好，你是什么模型")
+                .call()
+                .content());
     }
 }
