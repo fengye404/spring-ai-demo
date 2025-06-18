@@ -30,6 +30,7 @@ import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.util.CollectionUtils;
+import reactor.core.publisher.Flux;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -56,6 +57,11 @@ public class DashScopeModel implements ChatModel {
             return null;
         }
         return convertDashScopeResponse(res);
+    }
+
+    @Override
+    public Flux<ChatResponse> stream(Prompt prompt) {
+        return ChatModel.super.stream(prompt);
     }
 
     private ChatResponse convertDashScopeResponse(GenerationResult res) {
