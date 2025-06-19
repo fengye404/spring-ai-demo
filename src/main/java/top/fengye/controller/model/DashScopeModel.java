@@ -6,13 +6,9 @@ import com.alibaba.dashscope.aigc.generation.GenerationResult;
 import com.alibaba.dashscope.aigc.generation.GenerationUsage;
 import com.alibaba.dashscope.common.Message;
 import com.alibaba.dashscope.common.Role;
-import com.alibaba.dashscope.exception.ApiException;
-import com.alibaba.dashscope.exception.InputRequiredException;
-import com.alibaba.dashscope.exception.NoApiKeyException;
 import com.alibaba.dashscope.tools.*;
 import com.alibaba.dashscope.utils.JsonUtils;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.github.victools.jsonschema.generator.*;
+import io.reactivex.Flowable;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -32,11 +28,8 @@ import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * @author: FengYe
@@ -47,7 +40,9 @@ import java.util.stream.Stream;
 public class DashScopeModel implements ChatModel {
     @Override
     public ChatResponse call(Prompt prompt) {
-        GenerationParam generationParam = convertDashScopeParam(prompt);
+        GenerationParam generationParam = convertDashScopeParamBuilder(prompt)
+                .resultFormat(GenerationParam.ResultFormat.MESSAGE)
+                .incrementalOutput(false).build();
         com.alibaba.dashscope.aigc.generation.Generation gen = new com.alibaba.dashscope.aigc.generation.Generation();
         GenerationResult res = null;
         try {
@@ -61,7 +56,17 @@ public class DashScopeModel implements ChatModel {
 
     @Override
     public Flux<ChatResponse> stream(Prompt prompt) {
-        return ChatModel.super.stream(prompt);
+        GenerationParam generationParam = convertDashScopeParamBuilder(prompt)
+                .resultFormat(GenerationParam.ResultFormat.MESSAGE)
+                .incrementalOutput(true).build();
+        com.alibaba.dashscope.aigc.generation.Generation gen = new com.alibaba.dashscope.aigc.generation.Generation();
+        try {
+            Flux<GenerationResult> flux = Flux.from(gen.streamCall(generationParam));
+            return flux.map(this::convertDashScopeResponse);
+        } catch (Exception e) {
+            log.error("DashScopeModel call error", e);
+            return null;
+        }
     }
 
     private ChatResponse convertDashScopeResponse(GenerationResult res) {
@@ -99,7 +104,7 @@ public class DashScopeModel implements ChatModel {
         return new ChatResponse(List.of(generation), chatResponseMetadata);
     }
 
-    private GenerationParam convertDashScopeParam(Prompt prompt) {
+    private GenerationParam.GenerationParamBuilder<?, ?> convertDashScopeParamBuilder(Prompt prompt) {
         List<org.springframework.ai.chat.messages.Message> messages = prompt.getInstructions();
         ChatOptions options = prompt.getOptions();
         if (null == options) {
@@ -174,7 +179,7 @@ public class DashScopeModel implements ChatModel {
         }
 
 
-        return paramBuilder.build();
+        return paramBuilder;
     }
 
 
@@ -182,9 +187,10 @@ public class DashScopeModel implements ChatModel {
         ChatClient chatClient = ChatClient.create(new DashScopeModel());
         DefaultToolCallingChatOptions options = new DefaultToolCallingChatOptions();
         options.setModel("qwen-max");
-        System.out.println(chatClient.prompt().options(options)
+        Flux<String> content = chatClient.prompt().options(options)
                 .user("你好，你是什么模型")
-                .call()
-                .content());
+                .stream()
+                .content();
+        content.subscribe(System.out::println);
     }
 }
