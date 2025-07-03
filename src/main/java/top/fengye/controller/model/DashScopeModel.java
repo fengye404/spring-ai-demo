@@ -192,5 +192,6 @@ public class DashScopeModel implements ChatModel {
                 .stream()
                 .content();
         content.subscribe(System.out::println);
+
     }
 }
