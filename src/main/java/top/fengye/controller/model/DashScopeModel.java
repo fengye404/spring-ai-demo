@@ -11,6 +11,7 @@ import com.alibaba.dashscope.utils.JsonUtils;
 import io.reactivex.Flowable;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.metadata.ChatGenerationMetadata;
@@ -21,12 +22,12 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.model.tool.DefaultToolCallingChatOptions;
-import org.springframework.ai.model.tool.ToolCallingChatOptions;
+import org.springframework.ai.model.tool.*;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
+import top.fengye.controller.tool.WeatherService;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -38,8 +39,25 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 public class DashScopeModel implements ChatModel {
+
+    private final ToolExecutionEligibilityPredicate toolExecutionEligibilityPredicate = new DefaultToolExecutionEligibilityPredicate();
+
+    private final ToolCallingManager toolCallingManager = ToolCallingManager.builder().build();
+
     @Override
     public ChatResponse call(Prompt prompt) {
+        ChatResponse chatResponse = this.internalCall(prompt);
+        // 工具执行后，返回的结果再发给模型
+        if (this.toolExecutionEligibilityPredicate.isToolExecutionRequired(prompt.getOptions(), chatResponse)) {
+            ToolExecutionResult toolExecutionResult = this.toolCallingManager.executeToolCalls(prompt, chatResponse);
+            return toolExecutionResult.returnDirect() ? ChatResponse.builder().from(chatResponse).generations(ToolExecutionResult.buildGenerations(toolExecutionResult)).build()
+                    : this.internalCall(new Prompt(toolExecutionResult.conversationHistory(), prompt.getOptions()));
+        } else {
+            return chatResponse;
+        }
+    }
+
+    private ChatResponse internalCall(Prompt prompt) {
         GenerationParam generationParam = convertDashScopeParamBuilder(prompt)
                 .resultFormat(GenerationParam.ResultFormat.MESSAGE)
                 .incrementalOutput(false).build();
@@ -51,7 +69,8 @@ public class DashScopeModel implements ChatModel {
             log.error("DashScopeModel call error", e);
             return null;
         }
-        return convertDashScopeResponse(res);
+        ChatResponse chatResponse = convertDashScopeResponse(res);
+        return chatResponse;
     }
 
     @Override
@@ -184,14 +203,20 @@ public class DashScopeModel implements ChatModel {
 
 
     public static void main(String[] args) {
-        ChatClient chatClient = ChatClient.create(new DashScopeModel());
+        ChatClient chatClient = ChatClient.builder(new DashScopeModel())
+                .defaultTools(new WeatherService())
+                .defaultAdvisors(new SimpleLoggerAdvisor())
+                .build();
         DefaultToolCallingChatOptions options = new DefaultToolCallingChatOptions();
         options.setModel("qwen-max");
-        Flux<String> content = chatClient.prompt().options(options)
-                .user("你好，你是什么模型")
-                .stream()
-                .content();
-        content.subscribe(System.out::println);
+//        Flux<String> content = chatClient.prompt().options(options)
+//                .user("你好")
+//                .stream()
+//                .content();
+//        content.subscribe(System.out::println);
 
+        ChatClient.CallResponseSpec res = chatClient.prompt().options(options).user("杭州天气怎么样").call();
+        ChatResponse chatResponse = res.chatResponse();
+        System.out.println(res.content());
     }
 }

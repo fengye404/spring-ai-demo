@@ -11,5 +11,5 @@ spring:
     ollama:
       chat:
         options:
-          model: qwen3:4b   # 模型名称
+          model: qwen2.5:7b   # 模型名称
       base-url: http://localhost:11434

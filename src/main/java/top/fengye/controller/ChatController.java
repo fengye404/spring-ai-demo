@@ -2,13 +2,10 @@ package top.fengye.controller;
 
 
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.ai.model.tool.DefaultToolCallingChatOptions;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -16,9 +13,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
+import top.fengye.controller.tool.WeatherService;
 
 import java.io.IOException;
-import java.util.concurrent.CompletableFuture;
 
 
 /**
@@ -33,16 +30,15 @@ public class ChatController {
 
     private final ChatClient chatClient;
 
-    public ChatController(ChatClient.Builder builder) {
-        this.chatClient = builder.build();
+    public ChatController(ChatClient.Builder builder, WeatherService weatherService) {
+        this.chatClient = builder.defaultTools(weatherService).build();
     }
 
     @GetMapping("/chat")
     public String chat(@RequestParam(value = "input") String input) {
-        return this.chatClient.prompt()
+        return chatClient.prompt()
                 .user(input)
-                .call()
-                .content();
+                .call().content();
     }
 
     @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
