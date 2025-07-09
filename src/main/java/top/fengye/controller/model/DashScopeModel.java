@@ -140,13 +140,13 @@ public class DashScopeModel implements ChatModel {
                 .incrementalOutput(false)
                 .resultFormat(GenerationParam.ResultFormat.MESSAGE);
 
-        if(Objects.nonNull(options.getTemperature())){
+        if (Objects.nonNull(options.getTemperature())) {
             paramBuilder.temperature(options.getTemperature().floatValue());
         }
-        if(Objects.nonNull(options.getFrequencyPenalty())){
+        if (Objects.nonNull(options.getFrequencyPenalty())) {
             paramBuilder.repetitionPenalty(options.getFrequencyPenalty().floatValue());
         }
-        if(Objects.nonNull(options.getStopSequences())){
+        if (Objects.nonNull(options.getStopSequences())) {
             paramBuilder.stopStrings(options.getStopSequences());
         }
 
@@ -164,9 +164,22 @@ public class DashScopeModel implements ChatModel {
                             .content(message.getText())
                             .build());
                 case ASSISTANT:
+                    AssistantMessage assistantMessage = (AssistantMessage) message;
+                    List<ToolCallBase> tooCalls = new ArrayList<>();
+                    if (assistantMessage.hasToolCalls()) {
+                        AssistantMessage.ToolCall toolCall = assistantMessage.getToolCalls().getFirst();
+                        ToolCallFunction toolCallFunction = new ToolCallFunction();
+                        toolCallFunction.setId(toolCall.id());
+                        ToolCallFunction.CallFunction callFunction = toolCallFunction.new CallFunction();
+                        callFunction.setName(toolCall.name());
+                        callFunction.setArguments(toolCall.arguments());
+                        toolCallFunction.setFunction(callFunction);
+                        tooCalls.add(toolCallFunction);
+                    }
                     return List.of(Message.builder()
                             .role(Role.ASSISTANT.getValue())
                             .content(message.getText())
+                            .toolCalls(tooCalls)
                             .build());
                 case TOOL:
                     ToolResponseMessage toolResponseMessage = (ToolResponseMessage) message;
