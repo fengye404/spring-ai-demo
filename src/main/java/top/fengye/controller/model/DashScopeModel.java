@@ -27,6 +27,7 @@ import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 import top.fengye.controller.tool.WeatherService;
 
 import java.util.*;
@@ -75,6 +76,39 @@ public class DashScopeModel implements ChatModel {
 
     @Override
     public Flux<ChatResponse> stream(Prompt prompt) {
+        Flux<ChatResponse> chatResponseFlux = internalStream(prompt);
+        return chatResponseFlux.flatMap(response -> {
+            // todo
+            System.out.println(response.getResult().getOutput().getToolCalls());
+
+//            ChatResponse toolCall = ChatResponse.builder().from(response).generations(
+//                    List.of(
+//                            new Generation(new AssistantMessage("", new HashMap<>(), response.getResult().getOutput().getToolCalls()),
+//                                    ChatGenerationMetadata.builder().finishReason("toolCall").build()
+//                            )
+//                    )
+//            ).build();
+            System.out.println(response.hasToolCalls());
+            if (this.toolExecutionEligibilityPredicate.isToolExecutionRequired(prompt.getOptions(), response)) {
+                return Flux.defer(() -> {
+                    var toolExecutionResult = this.toolCallingManager.executeToolCalls(prompt, response);
+                    if (toolExecutionResult.returnDirect()) {
+                        // Return tool execution result directly to the client.
+                        return Flux.just(ChatResponse.builder().from(response)
+                                .generations(ToolExecutionResult.buildGenerations(toolExecutionResult))
+                                .build());
+                    } else {
+                        // Send the tool execution result back to the model.
+                        return this.stream(new Prompt(toolExecutionResult.conversationHistory(), prompt.getOptions()));
+                    }
+                }).subscribeOn(Schedulers.boundedElastic());
+            } else {
+                return Flux.just(response);
+            }
+        });
+    }
+
+    private Flux<ChatResponse> internalStream(Prompt prompt) {
         GenerationParam generationParam = convertDashScopeParamBuilder(prompt)
                 .resultFormat(GenerationParam.ResultFormat.MESSAGE)
                 .incrementalOutput(true).build();
@@ -216,20 +250,17 @@ public class DashScopeModel implements ChatModel {
 
 
     public static void main(String[] args) {
-        ChatClient chatClient = ChatClient.builder(new DashScopeModel())
-                .defaultTools(new WeatherService())
-                .defaultAdvisors(new SimpleLoggerAdvisor())
-                .build();
         DefaultToolCallingChatOptions options = new DefaultToolCallingChatOptions();
         options.setModel("qwen-max");
-//        Flux<String> content = chatClient.prompt().options(options)
-//                .user("你好")
-//                .stream()
-//                .content();
-//        content.subscribe(System.out::println);
+        ChatClient chatClient = ChatClient.builder(new DashScopeModel())
+                .defaultAdvisors(new SimpleLoggerAdvisor())
+                .defaultOptions(options)
+                .defaultTools(new WeatherService()).build();
 
-        ChatClient.CallResponseSpec res = chatClient.prompt().options(options).user("杭州天气怎么样").call();
-        ChatResponse chatResponse = res.chatResponse();
-        System.out.println(res.content());
+//        System.out.println(chatClient.prompt()
+//                .user("杭州天气怎么样")
+//                .call().content());
+
+        chatClient.prompt().user("杭州天气怎么样").stream().content().subscribe(System.out::println);
     }
 }

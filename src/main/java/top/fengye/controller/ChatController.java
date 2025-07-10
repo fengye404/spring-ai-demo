@@ -31,7 +31,7 @@ public class ChatController {
     private final ChatClient chatClient;
 
     public ChatController(ChatClient.Builder builder, WeatherService weatherService) {
-        this.chatClient = builder.defaultTools(weatherService).build();
+        this.chatClient = builder.defaultTools( new WeatherService()).build();
     }
 
     @GetMapping("/chat")
