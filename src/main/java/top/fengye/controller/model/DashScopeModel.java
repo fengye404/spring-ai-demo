@@ -26,11 +26,13 @@ import org.springframework.ai.model.tool.*;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 import top.fengye.controller.tool.WeatherService;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 /**
@@ -76,35 +78,50 @@ public class DashScopeModel implements ChatModel {
 
     @Override
     public Flux<ChatResponse> stream(Prompt prompt) {
+        AtomicReference<List<ChatResponse>> toolCall = new AtomicReference<>(new ArrayList<>());
         Flux<ChatResponse> chatResponseFlux = internalStream(prompt);
-        return chatResponseFlux.flatMap(response -> {
-            // todo
-            System.out.println(response.getResult().getOutput().getToolCalls());
 
-//            ChatResponse toolCall = ChatResponse.builder().from(response).generations(
-//                    List.of(
-//                            new Generation(new AssistantMessage("", new HashMap<>(), response.getResult().getOutput().getToolCalls()),
-//                                    ChatGenerationMetadata.builder().finishReason("toolCall").build()
-//                            )
-//                    )
-//            ).build();
-            System.out.println(response.hasToolCalls());
-            if (this.toolExecutionEligibilityPredicate.isToolExecutionRequired(prompt.getOptions(), response)) {
-                return Flux.defer(() -> {
-                    var toolExecutionResult = this.toolCallingManager.executeToolCalls(prompt, response);
-                    if (toolExecutionResult.returnDirect()) {
-                        // Return tool execution result directly to the client.
-                        return Flux.just(ChatResponse.builder().from(response)
-                                .generations(ToolExecutionResult.buildGenerations(toolExecutionResult))
-                                .build());
-                    } else {
-                        // Send the tool execution result back to the model.
-                        return this.stream(new Prompt(toolExecutionResult.conversationHistory(), prompt.getOptions()));
+        return Flux.create(sink->{
+            chatResponseFlux.subscribe(
+                    chatResponse -> {
+                        if (chatResponse.hasToolCalls()) {
+                            toolCall.get().add(chatResponse);
+                        }
+                        sink.next(chatResponse);
+                    },
+                    sink::error,
+                    ()->{
+                        // 流式输出下，模型返回的 function call response 会分多次返回，需要 merge 一下
+                        if(!toolCall.get().isEmpty()){
+                            // 1. 手动构造出 finishReason 为 toolCall 的 ChatResponse，并且推送到流中
+                            ChatResponse toolCallResponse = this.mergeToolCallResponse(toolCall.get());
+                            sink.next(toolCallResponse);
+
+                            // 2. 发起调用，获取结果并推送到流中
+                            System.out.println(toolCallResponse);
+                            ToolExecutionResult toolExecutionResult = toolCallingManager.executeToolCalls(prompt, toolCallResponse);
+                            sink.next(
+                                    ChatResponse.builder()
+                                            .from(toolCallResponse)
+                                            .metadata(ChatResponseMetadata.builder().id(UUID.randomUUID().toString()).build())
+                                            .generations(ToolExecutionResult.buildGenerations(toolExecutionResult))
+                                            .build()
+                            );
+
+                            if(toolExecutionResult.returnDirect()){
+                                sink.complete();
+                            }else {
+                                this.stream(prompt).subscribe(
+                                        sink::next,
+                                        sink::error,
+                                        sink::complete
+                                );
+                            }
+                        }else {
+                            sink.complete();
+                        }
                     }
-                }).subscribeOn(Schedulers.boundedElastic());
-            } else {
-                return Flux.just(response);
-            }
+            );
         });
     }
 
@@ -115,6 +132,7 @@ public class DashScopeModel implements ChatModel {
         com.alibaba.dashscope.aigc.generation.Generation gen = new com.alibaba.dashscope.aigc.generation.Generation();
         try {
             Flux<GenerationResult> flux = Flux.from(gen.streamCall(generationParam));
+            flux.subscribe(System.out::println);
             return flux.map(this::convertDashScopeResponse);
         } catch (Exception e) {
             log.error("DashScopeModel call error", e);
@@ -248,6 +266,46 @@ public class DashScopeModel implements ChatModel {
         return paramBuilder;
     }
 
+    private ChatResponse mergeToolCallResponse(List<ChatResponse> responseList) {
+
+        List<AssistantMessage.ToolCall> toolCallList = new ArrayList<>();
+        String mergeToolName = "";
+        String mergeArguments = "";
+        String mergeId = "";
+        for (ChatResponse response : responseList) {
+            if(response.getResult().getOutput().getToolCalls().get(0).id() != null){
+                mergeId = mergeId + response.getResult().getOutput().getToolCalls().get(0).id();
+            }
+            if(response.getResult().getOutput().getToolCalls().get(0).arguments() != null){
+                mergeArguments = mergeArguments + response.getResult().getOutput().getToolCalls().get(0).arguments();
+            }
+            if(response.getResult().getOutput().getToolCalls().get(0).name() != null){
+                mergeToolName = mergeToolName + response.getResult().getOutput().getToolCalls().get(0).name();
+            }
+
+            if(response.hasFinishReasons(Set.of("tool_calls"))){
+                toolCallList.add(
+                        new AssistantMessage.ToolCall(mergeId, "function", mergeToolName, mergeArguments)
+                );
+                mergeId = "";
+                mergeToolName = "";
+                mergeArguments = "";
+            }
+
+//            toolCallList.addAll(response.getResult().getOutput().getToolCalls());
+        }
+
+        return ChatResponse.builder()
+                .from(responseList.get(0))
+                .generations(List.of(
+                        new Generation(
+                                new AssistantMessage("", Collections.emptyMap(), toolCallList),
+                                ChatGenerationMetadata.builder().finishReason("tool_calls").build()
+                        )
+                ))
+                .build();
+    }
+
 
     public static void main(String[] args) {
         DefaultToolCallingChatOptions options = new DefaultToolCallingChatOptions();
@@ -261,6 +319,7 @@ public class DashScopeModel implements ChatModel {
 //                .user("杭州天气怎么样")
 //                .call().content());
 
+//        chatClient.prompt().user("你好，介绍下自己").stream().content().subscribe(System.out::println);
         chatClient.prompt().user("杭州天气怎么样").stream().content().subscribe(System.out::println);
     }
 }
