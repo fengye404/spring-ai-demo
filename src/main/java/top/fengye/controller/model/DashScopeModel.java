@@ -111,7 +111,7 @@ public class DashScopeModel implements ChatModel {
                             if(toolExecutionResult.returnDirect()){
                                 sink.complete();
                             }else {
-                                this.stream(prompt).subscribe(
+                                this.stream(new Prompt(toolExecutionResult.conversationHistory(), prompt.getOptions())).subscribe(
                                         sink::next,
                                         sink::error,
                                         sink::complete
@@ -132,7 +132,6 @@ public class DashScopeModel implements ChatModel {
         com.alibaba.dashscope.aigc.generation.Generation gen = new com.alibaba.dashscope.aigc.generation.Generation();
         try {
             Flux<GenerationResult> flux = Flux.from(gen.streamCall(generationParam));
-            flux.subscribe(System.out::println);
             return flux.map(this::convertDashScopeResponse);
         } catch (Exception e) {
             log.error("DashScopeModel call error", e);
@@ -267,7 +266,9 @@ public class DashScopeModel implements ChatModel {
     }
 
     private ChatResponse mergeToolCallResponse(List<ChatResponse> responseList) {
-
+        // 1. 单个 function call 拆分为多个 response 的情况，需要拼接 merge 一下，否则后续 toolCallingManager 调用会失败
+        // 例如 response1.arguments = {"location": "  response2.arguments = 杭州"}
+        // 拼接后 response.arguments = {"location": "杭州"}
         List<AssistantMessage.ToolCall> toolCallList = new ArrayList<>();
         String mergeToolName = "";
         String mergeArguments = "";
@@ -291,16 +292,15 @@ public class DashScopeModel implements ChatModel {
                 mergeToolName = "";
                 mergeArguments = "";
             }
-
-//            toolCallList.addAll(response.getResult().getOutput().getToolCalls());
         }
 
+        // 2. 一次流中有多个 function call，merge一下
         return ChatResponse.builder()
                 .from(responseList.get(0))
                 .generations(List.of(
                         new Generation(
                                 new AssistantMessage("", Collections.emptyMap(), toolCallList),
-                                ChatGenerationMetadata.builder().finishReason("tool_calls").build()
+                                ChatGenerationMetadata.builder().finishReason("toolCall").build()
                         )
                 ))
                 .build();
@@ -315,11 +315,6 @@ public class DashScopeModel implements ChatModel {
                 .defaultOptions(options)
                 .defaultTools(new WeatherService()).build();
 
-//        System.out.println(chatClient.prompt()
-//                .user("杭州天气怎么样")
-//                .call().content());
-
-//        chatClient.prompt().user("你好，介绍下自己").stream().content().subscribe(System.out::println);
         chatClient.prompt().user("杭州天气怎么样").stream().content().subscribe(System.out::println);
     }
 }
