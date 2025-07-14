@@ -81,7 +81,7 @@ public class DashScopeModel implements ChatModel {
         AtomicReference<List<ChatResponse>> toolCall = new AtomicReference<>(new ArrayList<>());
         Flux<ChatResponse> chatResponseFlux = internalStream(prompt);
 
-        return Flux.create(sink->{
+        return Flux.create(sink -> {
             chatResponseFlux.subscribe(
                     chatResponse -> {
                         if (chatResponse.hasToolCalls()) {
@@ -90,9 +90,9 @@ public class DashScopeModel implements ChatModel {
                         sink.next(chatResponse);
                     },
                     sink::error,
-                    ()->{
+                    () -> {
                         // 流式输出下，模型返回的 function call response 会分多次返回，需要 merge 一下
-                        if(!toolCall.get().isEmpty()){
+                        if (!toolCall.get().isEmpty()) {
                             // 1. 手动构造出 finishReason 为 toolCall 的 ChatResponse，并且推送到流中
                             ChatResponse toolCallResponse = this.mergeToolCallResponse(toolCall.get());
                             sink.next(toolCallResponse);
@@ -108,16 +108,16 @@ public class DashScopeModel implements ChatModel {
                                             .build()
                             );
 
-                            if(toolExecutionResult.returnDirect()){
+                            if (toolExecutionResult.returnDirect()) {
                                 sink.complete();
-                            }else {
+                            } else {
                                 this.stream(new Prompt(toolExecutionResult.conversationHistory(), prompt.getOptions())).subscribe(
                                         sink::next,
                                         sink::error,
                                         sink::complete
                                 );
                             }
-                        }else {
+                        } else {
                             sink.complete();
                         }
                     }
@@ -274,17 +274,17 @@ public class DashScopeModel implements ChatModel {
         String mergeArguments = "";
         String mergeId = "";
         for (ChatResponse response : responseList) {
-            if(response.getResult().getOutput().getToolCalls().get(0).id() != null){
+            if (response.getResult().getOutput().getToolCalls().get(0).id() != null) {
                 mergeId = mergeId + response.getResult().getOutput().getToolCalls().get(0).id();
             }
-            if(response.getResult().getOutput().getToolCalls().get(0).arguments() != null){
+            if (response.getResult().getOutput().getToolCalls().get(0).arguments() != null) {
                 mergeArguments = mergeArguments + response.getResult().getOutput().getToolCalls().get(0).arguments();
             }
-            if(response.getResult().getOutput().getToolCalls().get(0).name() != null){
+            if (response.getResult().getOutput().getToolCalls().get(0).name() != null) {
                 mergeToolName = mergeToolName + response.getResult().getOutput().getToolCalls().get(0).name();
             }
 
-            if(response.hasFinishReasons(Set.of("tool_calls"))){
+            if (response.hasFinishReasons(Set.of("tool_calls"))) {
                 toolCallList.add(
                         new AssistantMessage.ToolCall(mergeId, "function", mergeToolName, mergeArguments)
                 );
